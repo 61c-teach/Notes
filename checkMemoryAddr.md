@@ -1,12 +1,10 @@
-
-
-There are many questions about variable locations in memory layout, especially about string literals/char arrays. 
-In fact, there are ways to speculate memory locations, and here is a mini tutorial I made how how to use gcc, objdump and gdb to do that. 
+There are many questions about variable locations in memory layout, especially about string literals/char arrays.
+In fact, there are ways to speculate memory locations, and here is a mini tutorial I made how how to use gcc, objdump and gdb to do that.
 (The following demo is performed on linux. Please be aware that `objdump` program has different interface on MacOS. )
- 
-Let's start from a simple piece of code 
 
-```
+Let's start from a simple piece of code
+
+```c
 #include <string.h>
 #include <stdio.h>
 
@@ -25,15 +23,15 @@ int main () {
 }
 ```
 
-Copy-paste this code snippet to a file named demo.c, then compile it with 
-```
-gcc -O0 -g -o demo demo.c
+Copy-paste this code snippet to a file named demo.c, then compile it with
+```console
+$ gcc -O0 -g -o demo demo.c
 ```
 On executing this command, `gcc`, the compiler, would compile and link the code into an object file named `demo`.
 Now let's take a look at the section info using `objdump`. The command `objdump -h demo` I ran below is basically saying "showing me headers of all sections".
 
-```
-➜  61c objdump -h demo  
+```console
+$ objdump -h demo
 
 demo:     file format elf64-x86-64
 
@@ -107,11 +105,11 @@ Idx Name          Size      VMA               LMA               File off  Algn
                   CONTENTS, READONLY, DEBUGGING
 
 ```
-Don't be surprised at the many sections, but just in case you wonder, wiki has a good introduction of data sections: [Data Segment](https://en.wikipedia.org/wiki/Data_segment). 
+Don't be surprised at the many sections, but just in case you wonder, wiki has a good introduction of data sections: [Data Segment](https://en.wikipedia.org/wiki/Data_segment).
 (In fact, the memory layout model showed in class is the memory layout of a running program, while what you see here is the part that's "static".)
-Now that you know the existence of each section, let's check out their address using `-j` flag followed by a section name. For example: 
-```
-➜  61c objdump -s -j.data demo
+Now that you know the existence of each section, let's check out their address using `-j` flag followed by a section name. For example:
+```console
+$ objdump -s -j.data demo
 
 demo:     file format elf64-x86-64
 
@@ -120,9 +118,9 @@ Contents of section .data:
  404030 04204000 00000000                    . @.....
 ```
 The left most column under `Contents of section .data` denotes the memory address associated with content in this section.
-Another example: 
-```
-➜  61c objdump -s -j.text demo
+Another example:
+```console
+$ objdump -s -j.text demo
 
 demo:     file format elf64-x86-64
 
@@ -140,7 +138,7 @@ Contents of section .text:
  4010e0 803d512f 00000075 17554889 e5e87eff  .=Q/...u.UH...~.
  4010f0 ffffc605 3f2f0000 015dc30f 1f440000  ....?/...]...D..
  401100 c366662e 0f1f8400 00000000 0f1f4000  .ff...........@.
- 401110 eb8e5548 89e54883 ec3048c7 45f81420  ..UH..H..0H.E.. 
+ 401110 eb8e5548 89e54883 ec3048c7 45f81420  ..UH..H..0H.E..
  401120 400048b8 56696f6c 65747320 48ba6172  @.H.Violets H.ar
  401130 6520626c 75654889 45d04889 55d866c7  e blueH.E.H.U.f.
  401140 45e02e20 c645e200 c645d058 488d55d0  E.. .E...E.XH.U.
@@ -159,22 +157,22 @@ Contents of section .text:
 ```
 
 With enough knowledge about static section information, let's get the programming running and ask gdb where any given variable resides in the runtime memory layout.
-```
-gdb ./demo
+```console
+$ gdb ./demo
 ```
 (I'm personally not a big fan of cgdb.. there are a number of better command-line debuggers around if you need more fancy features, otherwise gdb itself probably suffices.)
-The screenshot below records what command I executed and what I got. The way you ask about the address of a certain variable is really the same in gdb as in C. Take a look and see what insights you can draw from these addresses that gdb printed out. 
+The screenshot below records what command I executed and what I got. The way you ask about the address of a certain variable is really the same in gdb as in C. Take a look and see what insights you can draw from these addresses that gdb printed out.
 ![](https://i.imgur.com/rqwk1wx.png)
 
-Global variables `greeting` and `big_num` have a very small address(only six hex digits). Notice that they are both in the range of `.data` section that `objdump` showed. Therefore, you know these two global variables are located in the static section(using that langauge we customized for 61c). 
+Global variables `greeting` and `big_num` have a very small address(only six hex digits). Notice that they are both in the range of `.data` section that `objdump` showed. Therefore, you know these two global variables are located in the static section(using that langauge we customized for 61c).
 Practially, you can pretty much safely assume any address starting from `0x7fff...` is an address on stack holding a very high position, which corresponds to a large number, on the memory layout.
-Therefore, you can immediately conclude that the two `char*` vaiables `str0`(at `0x7fffffffde18`) and `str1`(at `0x7fffffffddf0`) are sitting on stack. 
+Therefore, you can immediately conclude that the two `char*` vaiables `str0`(at `0x7fffffffde18`) and `str1`(at `0x7fffffffddf0`) are sitting on stack.
 
-If you checkout the address of a character within string greeting(screenshot below), you may notice that this should be an address in `.rodata` section according to objdump. So as you may recall from lectures, string literals are stored  read-only data in a C program. Therefore, I can conclude that global variable `greeting` is located in the `.data` section. It contains the address to a character which is located in the `.rodata` section. Both `.data` and `.rodata` belong to the data section we refer to in 61c. 
+If you checkout the address of a character within string greeting(screenshot below), you may notice that this should be an address in `.rodata` section according to objdump. So as you may recall from lectures, string literals are stored  read-only data in a C program. Therefore, I can conclude that global variable `greeting` is located in the `.data` section. It contains the address to a character which is located in the `.rodata` section. Both `.data` and `.rodata` belong to the data section we refer to in 61c.
 
 ![](https://i.imgur.com/oAykY6K.png)
 
 -- As a practice, can you create something on heap and verify its address?
 
 
-In conclusion, you can use this little trick whenever you are concerned about memory location of anything in a C program. Hope it helps. 
+In conclusion, you can use this little trick whenever you are concerned about memory location of anything in a C program. Hope it helps.
